@@ -14,6 +14,7 @@ import { statsPage } from './pages/stats.js';
 import { importPage } from './pages/importer.js';
 import { settingsPage, setAuth } from './pages/settings.js';
 import { mapPage, dayPage, playPage } from './pages/aml.js';
+import { termManagerPage, termEditPage, termPlayPage } from './pages/aml-terms.js';
 
 const app = document.getElementById('app');
 
@@ -37,6 +38,10 @@ const routes = [
   [/^\/aml$/, mapPage],
   [/^\/aml\/day\/(\d+)$/, dayPage, ['no']],
   [/^\/aml\/play$/, playPage],
+  [/^\/aml\/terms$/, termManagerPage],
+  [/^\/aml\/term\/new$/, termEditPage],
+  [/^\/aml\/term\/([^/]+)\/edit$/, termEditPage, ['id']],
+  [/^\/aml\/terms\/play$/, termPlayPage],
 ];
 // 别的设备改了数据时，这些页面自动刷新（输入中的页面不刷新）
 const LIVE = new Set(['/', '/library', '/stats', '/aml']);

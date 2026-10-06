@@ -11,9 +11,9 @@ export function mapPage() {
        <button class="primary" data-seed>一键导入 Day 1</button></div>`
     : '<p class="center"><button class="link-plain" data-seed>重新补充 Day 1 示例（已有的不会重复）</button></p>';
   return {
-    html: `<main>${header(back('#/'), '🎮 AML 审查官养成')}
+    html: `<main>${header(back('#/'), '🧠 AML Learning', '<a class="header-edit" href="#/aml/terms?day=Day1">✏️ 编辑</a>')}
       ${toast(takeFlash())}
-      <section class="hero aml-hero"><small>现在的等级</small><h1>${level}</h1>
+      <section class="hero aml-hero"><small>你的 AML 学习路线</small><h1>${level}</h1>
         <p class="muted">通关 ${cleared} / 14 天 · 今天做了 ${t.count} 题 · 连续打卡 ${t.streak} 天</p>
         <div class="bar"><i style="width:${Math.round(cleared * 100 / 14)}%"></i></div>
         <p class="muted small-note">每天掌握 80% 以上就算通关。3 天 → アシスタント，6 天 → 審査担当，10 天 → シニア，14 天 → アナリスト</p></section>
@@ -46,30 +46,54 @@ export function dayPage({ params }) {
   const d = aml.days()[no - 1];
   const shadowCount = aml.playData(d.key, 'shadow').length;
   const play = (game, dir) => link('/aml/play', { day: d.key, game, dir });
+  const termPlay = (mode) => link('/aml/terms/play', { day: d.key, mode });
   const add = (q) => link('/add', Object.assign({ subject: 'AML', category: d.key }, q));
+  const completeTerms = aml.terms(d.key).filter((t) => t.title && t.enText && t.jaText && (t.zhText || t.answer)).length;
   return {
-    html: `<main>${header(back('#/aml'), 'Day ' + no)}
+    html: `<main>${header(back('#/aml'), 'Day ' + no, `<a class="header-edit" href="${link('/aml/terms',{day:d.key})}">✏️ 内容</a>`)}
       <h2>${esc(d.title)}</h2>
       <p class="muted">掌握 ${d.mastered} / ${d.total}（${d.percent}%）${d.cleared ? ' · ✅ 已通关' : ''}</p>
       <div class="bar"><i style="width:${d.percent}%"></i></div>
-      <div class="games">
-        <div class="game-card ${d.words ? '' : 'off'}"><b>🃏 ① 词卡速记</b><small>${d.words} 个词 · 4 选 1 抢答，连击加分</small>
-          ${d.words ? `<div class="actions"><a class="primary" href="${play('vocab', 'ja')}">日 → 中</a><a class="secondary" href="${play('vocab', 'zh')}">中 → 日</a></div>
-          <a class="primary listen-btn" href="${play('vocab', 'listen')}">👂 听音速答（只听发音，选意思）</a>` : ''}
-          <a class="add-link" href="${add({ type: 'WORD' })}">＋ 添加生词</a></div>
-        <div class="game-card ${d.classify ? '' : 'off'}"><b>🗂 ② 三者分类</b><small>${d.classify} 题 · 这是 KYC、フィルタリング 还是 モニタリング？</small>
-          ${d.classify ? `<a class="primary" href="${play('classify')}">开始</a>` : ''}
-          <a class="add-link" href="${add({ type: 'QUESTION', tags: '#三者分类' })}">＋ 添加分类题</a></div>
-        <div class="game-card ${d.rule ? '' : 'off'}"><b>⚖️ ③ 规则判定</b><small>${d.rule} 题 · 这笔交易会不会ヒット？</small>
-          ${d.rule ? `<a class="primary" href="${play('rule')}">开始</a>` : ''}
-          <a class="add-link" href="${add({ type: 'QUESTION', tags: '#规则判定' })}">＋ 添加判定题</a></div>
-        <div class="game-card ${shadowCount ? '' : 'off'}"><b>🎙 ④ 影子跟读</b><small>${shadowCount} 句 · 听标准音 → 跟读录音 → 自动打分</small>
-          ${shadowCount ? `<a class="primary" href="${play('shadow')}">开始</a>` : ''}
-          <span class="add-link muted">句子来自：例句 / 生词 / 标签 #跟读</span></div>
+
+      <section class="learning-path"><span class="path-on">① 记忆</span><span>② 理解</span><span>③ 判断</span><span>④ 流程</span><span>⑤ 输出</span></section>
+
+      <div class="games learning-modules">
+        <div class="game-card learning-card ${completeTerms ? '' : 'off'}">
+          <div class="module-head"><span class="module-no">01</span><div><b>多角度词汇记忆</b><small>缩写 ↔ 英文 ↔ 日语 ↔ 中文，同一个词从多个方向反复记忆</small></div></div>
+          <div class="term-example"><span>KYC</span><i>→</i><span>Know Your Customer</span><i>↔</i><span>顧客確認</span><i>↔</i><span>客户身份识别</span></div>
+          ${completeTerms ? `<div class="actions three"><a class="primary" href="${termPlay('choice')}">选择题</a><a class="secondary" href="${termPlay('half')}">半填空</a><a class="secondary" href="${termPlay('full')}">完整填空</a></div>` : '<p class="toast warn">先补全至少 2 条词汇的中 / 日 / 英信息。</p>'}
+          <a class="add-link" href="${link('/aml/terms',{day:d.key})}">✏️ 管理词汇内容（${d.words} 条）</a>
+        </div>
+
+        <div class="game-card learning-card concept-card">
+          <div class="module-head"><span class="module-no">02</span><div><b>概念理解</b><small>不是背翻译，而是理解“它到底在检查什么”</small></div></div>
+          <div class="memory-hooks"><span><b>KYC</b>誰？何のため？リスクは？</span><span><b>Filtering</b>誰と取引する？</span><span><b>Monitoring</b>どう取引している？</span></div>
+          <a class="secondary" href="${link('/library',{subject:'AML',cat:d.key,type:'KNOWLEDGE'})}">查看这一天的知识点</a>
+          <a class="add-link" href="${add({type:'KNOWLEDGE'})}">＋ 添加概念说明</a>
+        </div>
+
+        <div class="game-card learning-card ${d.classify ? '' : 'off'}">
+          <div class="module-head"><span class="module-no">03</span><div><b>分类判断</b><small>关键词 → 句子 → 场景：判断属于 KYC / Filtering / Monitoring</small></div></div>
+          ${d.classify ? `<a class="primary" href="${play('classify')}">开始判断（${d.classify} 题）</a>` : ''}
+          <a class="add-link" href="${add({ type: 'QUESTION', tags: '#三者分类' })}">＋ 添加分类题</a>
+        </div>
+
+        <div class="game-card learning-card ${d.rule ? '' : 'off'}">
+          <div class="module-head"><span class="module-no">04</span><div><b>业务流程理解</b><small>Scenario → Threshold → Hit → Alert → 人工确认</small></div></div>
+          <div class="flow-mini"><span>取引</span><i>→</i><span>Scenario</span><i>→</i><span>閾値</span><i>→</i><span>Hit</span><i>→</i><span>Alert</span></div>
+          ${d.rule ? `<a class="primary" href="${play('rule')}">规则判定（${d.rule} 题）</a>` : ''}
+          <a class="add-link" href="${add({ type: 'QUESTION', tags: '#规则判定' })}">＋ 添加流程 / 判定题</a>
+        </div>
+
+        <div class="game-card learning-card ${shadowCount ? '' : 'off'}">
+          <div class="module-head"><span class="module-no">05</span><div><b>案例与日语输出</b><small>先理解 → 自己说明 → 听标准音 → 跟读</small></div></div>
+          ${shadowCount ? `<a class="primary" href="${play('shadow')}">日语输出 / 跟读（${shadowCount} 句）</a>` : ''}
+          <span class="add-link muted">句子来自：例句 / 生词 / 标签 #跟读</span>
+        </div>
       </div>
-      <div class="actions"><a class="secondary" href="${link('/library', { subject: 'AML', cat: d.key })}">📚 这一天的全部记录</a>
+      <div class="actions"><a class="secondary" href="${link('/library', { subject: 'AML', cat: d.key })}">📚 全部内容</a>
         <a class="secondary" href="#/import">📥 批量导入</a></div>
-      <p class="muted small-note">提示：分类填 <b>${d.key}</b>、科目选 AML，记录就会出现在这一天。</p>
+      <p class="muted small-note">推荐：先把 ① 多角度词汇记忆 的内容补齐，再逐步增加理解、判断和案例。内容都可以自己编辑。</p>
     </main>`,
   };
 }

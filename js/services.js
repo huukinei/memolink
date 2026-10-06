@@ -290,6 +290,35 @@ export const aml = {
     return m ? 'Day' + m[1] : category;
   },
   items() { return study.all().filter((i) => i.subject === 'AML'); },
+  /** AML 词条：兼容旧版 WORD；新版一条记录保存 缩写/英文/日语/中文 */
+  terms(day) {
+    const key = this.dayKey(day || '');
+    return this.items().filter((i) => isWord(i))
+      .filter((i) => !key || this.dayKey(i.category) === key)
+      .sort((a, b) => String(a.title || '').localeCompare(String(b.title || '')));
+  },
+  /** 把旧版 Day1 生词补成新版的 缩写/英文/日语/中文 结构；只处理内置示例词 */
+  async upgradeLegacyTerms() {
+    const defs = [
+      ['AML','AML','Anti-Money Laundering','アンチ・マネー・ローンダリング','反洗钱','怪しいお金の流れを見つける','マネー・ローンダリングを防止し、不正な資金の流れを検知・防止する取り組み。'],
+      ['KYC','KYC','Know Your Customer','顧客確認','客户身份识别 / 客户尽职调查','誰？何のため？リスクは？','顧客が誰で、何のために取引し、どの程度リスクがあるかを確認する。'],
+      ['フィルタリング','Filtering','Filtering / Screening','フィルタリング（スクリーニング）','名单筛查 / 过滤','WHO ARE YOU DEALING WITH?','顧客や取引関係者を制裁リスト等と照合し、対象者に該当しないか確認する。'],
+      ['モニタリング','Monitoring','Transaction Monitoring','取引モニタリング','交易监控','HOW ARE YOU TRANSACTING?','取引の金額・回数・頻度・送金先などを監視し、不自然な取引を検知する。'],
+      ['シナリオ','Scenario','Scenario','シナリオ','检测规则 / 场景规则','どんな取引を怪しいと判断する？','疑わしい取引を見つけるために、あらかじめ設定された検知条件。'],
+      ['ヒットする','Hit','Hit','ヒット','触发规则','ヒット ≠ マネロン確定','取引が設定されたシナリオの条件に該当すること。'],
+      ['閾値','Threshold','Threshold','閾値','阈值','この線を超えたら判定','判定の基準となる数値。例：300万円以上なら300万円が閾値。'],
+      ['照合','Matching','Matching / Screening','照合','对照 / 比对','照らし合わせる','顧客や取引相手の情報をリスト等と照らし合わせること。'],
+    ];
+    let n = 0;
+    for (const [oldTitle,title,en,ja,zh,mnemonic,desc] of defs) {
+      const i = this.items().find((x) => isWord(x) && this.dayKey(x.category) === 'Day1' && (x.title === oldTitle || x.title === title));
+      if (!i) continue;
+      const tags = new Set(String(i.tags || '').split(/\s+/).filter(Boolean)); tags.add('#AML词条');
+      await study.update(i.id, { title, enText: en, jaText: ja, zhText: zh, answer: zh, mnemonic, customBody1: desc, tags: [...tags].join(' ') });
+      n++;
+    }
+    return n;
+  },
   hasTag: (i, t) => i.tags != null && i.tags.includes(t),
 
   days() {
@@ -354,18 +383,19 @@ export const aml = {
     const add = async (key, item) => { const s = await study.save(item); if (key) ids[key] = s.id; n++; };
 
     const words = [
-      ['AML', 'エーエムエル', '反洗钱', 'Anti-Money Laundering', 'AMLとは、マネー・ローンダリングを防ぐための取り組みです。', '怪しいお金の流れを見つけて、不正な取引を防ぐ仕組み'],
-      ['KYC', 'ケーワイシー', '了解你的客户（客户身份确认）', 'Know Your Customer', 'KYCは、顧客がどんな人なのかを確認するものです。', 'WHO ARE YOU? → この顧客はどんな人？（这个人是谁？）'],
-      ['フィルタリング', 'ふぃるたりんぐ', '过滤（与制裁名单比对）', 'Filtering', 'フィルタリングは、取引関係者を制裁対象者などのリストと照合するものです。', 'WHO ARE YOU DEALING WITH? → この取引相手は大丈夫？（这个人和谁交易？）'],
-      ['モニタリング', 'もにたりんぐ', '交易监控', 'Monitoring', '取引モニタリングでは、不自然な取引や疑わしい取引を検知します。', 'HOW ARE YOU TRANSACTING? → この取引、怪しくない？（这个人怎么交易？）'],
-      ['シナリオ', 'しなりお', '检测规则', 'Scenario', 'シナリオとは、疑わしい取引を見つけるために、あらかじめ設定された条件です。', '哪种交易算可疑？'],
-      ['ヒットする', 'ひっとする', '触发（检测规则）', 'to hit (a scenario)', 'この取引はシナリオにヒットしました。', 'ヒットした ≠ マネロン確定 → 只是需要进一步确认'],
-      ['閾値', 'しきいち', '阈值', 'Threshold', '300万円以上を検知する場合、300万円が閾値です。', '×敷居値 ○閾値（读音一样）。到多少才触发'],
-      ['照合', 'しょうごう', '对照、比对', 'matching / screening', '取引関係者を制裁リストと照合します。', '照らし合わせる'],
+      // [缩写/主词, 读音, 中文, 英文全称, 日语, 一句话理解, 记忆关键词]
+      ['AML', 'エーエムエル', '反洗钱', 'Anti-Money Laundering', 'アンチ・マネー・ローンダリング', 'マネー・ローンダリングを防止し、不正な資金の流れを検知・防止する取り組み。', '怪しいお金の流れを見つける'],
+      ['KYC', 'ケーワイシー', '客户身份识别 / 客户尽职调查', 'Know Your Customer', '顧客確認', '顧客が誰で、何のために取引し、どの程度リスクがあるかを確認する。', '誰？何のため？リスクは？'],
+      ['Filtering', 'フィルタリング', '名单筛查 / 过滤', 'Filtering / Screening', 'フィルタリング（スクリーニング）', '顧客や取引関係者を制裁リスト等と照合し、対象者に該当しないか確認する。', 'WHO ARE YOU DEALING WITH?'],
+      ['Monitoring', 'モニタリング', '交易监控', 'Transaction Monitoring', '取引モニタリング', '取引の金額・回数・頻度・送金先などを監視し、不自然な取引を検知する。', 'HOW ARE YOU TRANSACTING?'],
+      ['Scenario', 'シナリオ', '检测规则 / 场景规则', 'Scenario', 'シナリオ', '疑わしい取引を見つけるために、あらかじめ設定された検知条件。', 'どんな取引を怪しいと判断する？'],
+      ['Hit', 'ヒット', '触发规则', 'Hit', 'ヒット', '取引が設定されたシナリオの条件に該当すること。', 'ヒット ≠ マネロン確定'],
+      ['Threshold', 'しきいち', '阈值', 'Threshold', '閾値', '判定の基準となる数値。例：300万円以上なら300万円が閾値。', 'この線を超えたら判定'],
+      ['Matching', 'しょうごう', '对照 / 比对', 'Matching / Screening', '照合', '顧客や取引相手の情報をリスト等と照らし合わせること。', '照らし合わせる'],
     ];
     for (const w of words) {
       if (exists.has(w[0])) continue;
-      await add(w[0], base('WORD', w[0], { reading: w[1], answer: w[2], enText: w[3], example: w[4], mnemonic: w[5] }));
+      await add(w[0], base('WORD', w[0], { reading: w[1], answer: w[2], zhText: w[2], enText: w[3], jaText: w[4], customBody1: w[5], mnemonic: w[6], tags: '#AML词条' }));
     }
     const kt = 'KYC・フィルタリング・モニタリングの違い';
     if (!exists.has(kt)) {
